@@ -1,0 +1,48 @@
+name: App Review Analysis
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # 每周日午夜运行
+  workflow_dispatch:      # 允许手动触发
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install google-play-scraper pandas tqdm matplotlib seaborn openai
+        
+    - name: Run analysis
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      run: |
+        python review_analyzer.py
+        
+    - name: Setup report directory
+      run: |
+        mkdir -p public
+        # 找到最新的分析目录
+        LATEST_DIR=$(ls -td analysis_* | head -1)
+        echo "最新分析目录: $LATEST_DIR"
+        
+        # 复制HTML报告和可视化内容到public目录
+        cp -r $LATEST_DIR/* public/
+        
+        # 创建索引页面
+        echo "<html><head><meta http-equiv='refresh' content='0;url=$(find public -name "*_analysis_report.html" | sed 's|public/||')' /></head></html>" > public/index.html
+        
+    - name: Deploy to GitHub Pages
+      uses: JamesIves/github-pages-deploy-action@v4
+      with:
+        folder: public  # 要部署的文件夹
